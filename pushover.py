@@ -52,6 +52,11 @@ for option, default_value in settings.items():
         weechat.prnt("", weechat.prefix("error") + "pushover: Please set option: %s" % option)
         weechat.prnt("", "pushover: /set plugins.var.python.pushover.%s STRING" % option)
 
+if weechat.config_get_plugin("flood_seconds") == "":
+    weechat.config_set_plugin("flood_seconds", "300")
+
+floodcontroltime = 0
+
 # Hook privmsg/hilights
 weechat.hook_print("", "irc_privmsg", "", 1, "notify_show", "")
 
@@ -59,27 +64,35 @@ weechat.hook_print("", "irc_privmsg", "", 1, "notify_show", "")
 def notify_show(data, bufferp, uber_empty, tagsn, isdisplayed,
         ishilight, prefix, message):
 
+    #detect if this would be spammy
+    global floodcontroltime
+    priority = 0
+    if floodcontroltime + int(weechat.config_get_plugin("flood_seconds")) > int(os.times()[4]):
+        priority = -1
+    else:
+        floodcontroltime = os.times()[4]
+
     #get local nick for buffer
     mynick = weechat.buffer_get_string(bufferp,"localvar_nick")
 
     # only notify if the message was not sent by myself
     if (weechat.buffer_get_string(bufferp, "localvar_type") == "private") and (prefix!=mynick):
-            show_notification(prefix, prefix, message)
+            show_notification(prefix, prefix, message, priority)
 
     elif ishilight == "1":
         buffer = (weechat.buffer_get_string(bufferp, "short_name") or
                 weechat.buffer_get_string(bufferp, "name"))
-        show_notification(buffer, prefix, message)
+        show_notification(buffer, prefix, message, priority, priority)
 
     return weechat.WEECHAT_RC_OK
 
-def show_notification(chan, nick, message):
+def show_notification(chan, nick, message, priority):
     PUSHOVER_USER = weechat.config_get_plugin("user")
     PUSHOVER_API_SECRET = weechat.config_get_plugin("token")
     if PUSHOVER_USER != "" and PUSHOVER_API_SECRET != "":
         url = "https://api.pushover.net/1/messages.json"
         message = '<'+nick+'> '+message
-        postdata = urllib.urlencode({'token':PUSHOVER_API_SECRET,'user':PUSHOVER_USER,'message':message,'title':'weechat: '+chan})
+        postdata = urllib.urlencode({'token':PUSHOVER_API_SECRET,'user':PUSHOVER_USER,'message':message,'title':'weechat: '+chan,'priority':priority})
         version = weechat.info_get("version_number", "") or 0
         if int(version) >= 0x00030700: # use weechat.hook_process_hashtable only with weechat version >= 0.3.7
           hook1 = weechat.hook_process_hashtable("url:"+url, { "postfields":  postdata}, 2000, "", "")
