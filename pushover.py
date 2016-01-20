@@ -82,7 +82,7 @@ def notify_show(data, bufferp, uber_empty, tagsn, isdisplayed,
     elif ishilight == "1":
         buffer = (weechat.buffer_get_string(bufferp, "short_name") or
                 weechat.buffer_get_string(bufferp, "name"))
-        show_notification(buffer, prefix, message, priority, priority)
+        show_notification(buffer, prefix, message, priority)
 
     return weechat.WEECHAT_RC_OK
 
